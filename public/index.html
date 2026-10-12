@@ -77,6 +77,16 @@
 
   <div class="layout">
     <div>
+      <section class="pane" id="pane-mesa" hidden>
+        <div id="mesa-bar"></div>
+        <div class="mesa-split">
+          <div class="mapa-col">
+            <div class="mapa-wrap" id="mapa-wrap"><div class="mapa" id="mapa"><img id="mapa-img" alt="" draggable="false"><div class="grade" id="mapa-grade"></div><div id="mapa-tokens"></div></div><div class="mapa-vazio" id="mapa-vazio" hidden></div></div>
+            <div class="row mapa-zoom"><button class="btn sm" type="button" data-zoom="-1" aria-label="Diminuir zoom">−</button><button class="btn sm" type="button" data-zoom="0">Ajustar</button><button class="btn sm" type="button" data-zoom="1" aria-label="Aumentar zoom">+</button><span class="lbl" id="mapa-dica"></span></div>
+          </div>
+          <div class="mesa-side" id="mesa-side"></div>
+        </div>
+      </section>
       <section class="pane" id="pane-combate">
         <div class="toolbar" id="turn-bar"></div>
         <div class="cb-list" id="cb-list"></div>
@@ -136,6 +146,7 @@
   </div>
 </div>
 
+<input type="file" id="up-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
 <div class="voz" id="voz" role="status" aria-live="assertive" hidden><span class="lbl" id="voz-quem"></span><p id="voz-texto"></p></div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 

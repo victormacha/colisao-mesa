@@ -222,7 +222,30 @@
    "caBase": 8,
    "tecnica": 2,
    "oculto": true,
-   "notas": "Calamidade 3. Abraço de Cinza 2d6 (Fortitude Dt 8 ou perde 1 PA). Amém: em área, Vontade Dt = Medo atual ou ajoelha e perde o turno."
+   "notas": "Calamidade 3. Abraço de Cinza 2d6 (Fortitude Dt 8 ou perde 1 PA). Amém: em área, Vontade Dt = Medo atual ou ajoelha e perde o turno.",
+   "imagem": "b:/tokens/aquele-que-responde.png"
+  }
+ ],
+ "cenas": [
+  {
+   "nome": "Vale das Cinzas",
+   "mapa": "b:/mapas/vale-das-cinzas.jpg",
+   "grade": false,
+   "tokens": []
+  },
+  {
+   "nome": "Igreja velha",
+   "mapa": "b:/mapas/igreja-velha.jpg",
+   "grade": false,
+   "tokens": [
+    {
+     "criatura": 0,
+     "x": 0.5,
+     "y": 0.2,
+     "tam": 2,
+     "visivel": false
+    }
+   ]
   }
  ]
 }

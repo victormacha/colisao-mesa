@@ -180,6 +180,46 @@ details.adj[open] summary { margin-bottom: 8px; }
 .block { display: grid; gap: 8px; padding-left: 12px; border-left: 2px solid var(--brass-dim); }
 .saved { font: 500 12px var(--f-mono); color: var(--ash); }
 
+/* Mesa: mapa e tokens */
+.mesa-split { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1500px) { .mesa-split.gm { grid-template-columns: minmax(0, 1fr) 250px; align-items: start; } }
+.mapa-col { display: grid; gap: 8px; min-width: 0; }
+.mapa-wrap { position: relative; overflow: auto; max-height: min(74vh, 800px); min-height: 220px; background: #0a0a0c; border: 1px solid var(--rule); border-radius: var(--r); touch-action: none; cursor: grab; }
+.mapa-wrap.pan { cursor: grabbing; }
+.mapa { position: relative; margin: 0 auto; user-select: none; -webkit-user-select: none; }
+.mapa img { display: block; width: 100%; height: auto; pointer-events: none; }
+.mapa .grade { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(to right, rgba(235,229,216,.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(235,229,216,.16) 1px, transparent 1px); }
+.mapa-vazio { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--ash); padding: 24px; }
+.mapa-zoom { justify-content: flex-start; }
+.mapa-zoom .lbl { margin-left: 8px; text-transform: none; letter-spacing: 0; font-size: 13px; }
+.tk { position: absolute; transform: translate(-50%, -50%); width: calc(var(--tk, 40px) * var(--t, 1)); display: grid; justify-items: center; gap: 2px; z-index: 2; touch-action: none; }
+.tk[data-drag] { cursor: grab; }
+.tk-img { width: 100%; aspect-ratio: 1; border-radius: 50%; background: var(--panel-2) center / cover no-repeat; border: 3px solid var(--cold); box-shadow: 0 3px 10px rgba(0,0,0,.6); display: grid; place-items: center; font: 700 calc(var(--tk, 40px) * .32) var(--f-body); color: var(--bone); overflow: hidden; }
+.tk.t-criatura .tk-img { border-color: var(--blood); }
+.tk.meu .tk-img { box-shadow: 0 0 0 3px var(--brass), 0 3px 10px rgba(0,0,0,.6); }
+.tk.turno .tk-img { box-shadow: 0 0 0 4px var(--brass), 0 0 22px var(--brass); }
+.tk.sel .tk-img { outline: 3px dashed var(--bone); outline-offset: 3px; }
+.tk.oculto { opacity: .5; }
+.tk.oculto .tk-img { border-style: dashed; }
+.tk.caido .tk-img { filter: grayscale(1) brightness(.6); }
+.tk-nome { font-size: 11px; font-weight: 700; line-height: 1.1; padding: 1px 6px; border-radius: 3px; background: rgba(10,10,12,.82); white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.mesa-side { display: grid; gap: 12px; align-content: start; }
+.mesa-side .card { padding: 12px; gap: 8px; }
+.tk-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--rule); }
+.tk-row:first-of-type { border-top: 0; }
+.tk-row .av { width: 30px; height: 30px; border-radius: 50%; background: var(--panel-2) center / cover; flex: none; display: grid; place-items: center; font: 700 11px var(--f-body); border: 2px solid var(--cold); }
+.tk-row .av.c { border-color: var(--blood); }
+.tk-row span.n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.tk-row.sel { background: color-mix(in srgb, var(--brass) 10%, transparent); }
+.mesa-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r); }
+.mesa-bar select { max-width: 220px; }
+.badge.live { color: var(--ok); }
+.retrato { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 480px) { .retrato { grid-template-columns: 1fr; } }
+.retrato-img { width: 120px; aspect-ratio: 1; border-radius: 50%; background: var(--panel-2) center / cover; border: 3px solid var(--cold); display: grid; place-items: center; color: var(--ash); font-size: 12px; text-align: center; }
+.cb-av { width: 34px; height: 34px; border-radius: 50%; background: var(--panel-2) center / cover; border: 2px solid var(--cold); flex: none; display: grid; place-items: center; font: 700 12px var(--f-body); }
+.cb.t-criatura .cb-av { border-color: var(--blood); }
+
 /* Dados */
 .tray { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r); padding: 14px; display: grid; gap: 12px; }
 .tray h3 { font-family: var(--f-display); font-weight: 400; font-size: 26px; margin: 0; }

@@ -55,6 +55,47 @@ async function load() {
   for (const [t, s] of Object.entries(DB.sessions)) if (s.exp < now()) delete DB.sessions[t];
   console.log(`Dados carregados (${USE_SUPABASE ? "Supabase" : "arquivo em " + DATA_DIR}): ${Object.keys(DB.users).length} contas, ${Object.keys(DB.salas).length} salas.`);
 }
+// ---- imagens (retratos, mapas, criaturas): Supabase Storage ou pasta local
+const BUCKET = process.env.SUPABASE_BUCKET || "colisao";
+const IMG_MIME = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
+const imgCache = new Map(); // id -> {buf, mime}, guarda as 80 mais recentes
+function cachear(id, v) { imgCache.delete(id); imgCache.set(id, v); if (imgCache.size > 80) imgCache.delete(imgCache.keys().next().value); }
+async function garantirBucket() {
+  if (!USE_SUPABASE) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/bucket`, { method: "POST", headers: sbHeaders(), body: JSON.stringify({ id: BUCKET, name: BUCKET, public: false }) });
+    if (r.ok) console.log(`Bucket "${BUCKET}" criado no Supabase.`);
+  } catch (e) { console.error("Não consegui conferir o bucket de imagens:", e.message); }
+}
+async function imgSalvar(id, buf, mime) {
+  if (USE_SUPABASE) {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${id}`, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": mime, "x-upsert": "true" }, body: buf });
+    if (!r.ok) throw new Error(`Supabase Storage respondeu ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  } else {
+    const dir = path.join(DATA_DIR, "img"); await fsp.mkdir(dir, { recursive: true });
+    await fsp.writeFile(path.join(dir, `${id}.${IMG_MIME[mime]}`), buf);
+  }
+  cachear(id, { buf, mime });
+}
+async function imgLer(id) {
+  if (imgCache.has(id)) { const v = imgCache.get(id); cachear(id, v); return v; }
+  let v = null;
+  if (USE_SUPABASE) {
+    for (const rota of [`object/authenticated/${BUCKET}/${id}`, `object/${BUCKET}/${id}`]) {
+      const r = await fetch(`${SUPABASE_URL}/storage/v1/${rota}`, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } });
+      if (r.ok) { v = { buf: Buffer.from(await r.arrayBuffer()), mime: (r.headers.get("content-type") || "image/jpeg").split(";")[0] }; break; }
+    }
+  } else {
+    const dir = path.join(DATA_DIR, "img");
+    for (const [mime, ext] of Object.entries(IMG_MIME)) {
+      const buf = await fsp.readFile(path.join(dir, `${id}.${ext}`)).catch(() => null);
+      if (buf) { v = { buf, mime }; break; }
+    }
+  }
+  if (v) cachear(id, v);
+  return v;
+}
+
 let saveT = null, saving = false, again = false;
 function persist() { clearTimeout(saveT); saveT = setTimeout(flush, 1000); }
 async function flush() {
@@ -123,7 +164,10 @@ function novaFicha(dono, nome) {
     notas: "", iniciativa: null, criadoEm: now(), atualizadoEm: now(),
   };
 }
-const FICHA_STR = { nome: 60, idade: 20, nacionalidade: 60, ocupacao: 60, estadoCivil: 40, nascimento: 20, rota: 60, arquivo: 30, chamado: 200, notas: 4000 };
+const FICHA_STR = { nome: 60, idade: 20, nacionalidade: 60, ocupacao: 60, estadoCivil: 40, nascimento: 20, rota: 60, arquivo: 30, chamado: 200, notas: 4000, aparencia: 800 };
+// Imagem: "b:/mapas/x.jpg" (arte que vem com o app) ou "u:<id>" (enviada por alguém)
+const IMG_RE = /^(b:\/(mapas|tokens)\/[a-z0-9-]{1,60}\.(jpg|png|webp|svg)|u:[A-Za-z0-9]{12,32})$/;
+function imgRef(v) { const s = String(v ?? ""); if (s === "") return ""; if (!IMG_RE.test(s)) throw new Erro(400, "Imagem inválida."); return s; }
 const FICHA_NUM = { patente: [1, 10], pv: [-99, 999], pvMax: [1, 999], caBase: [0, 50], mov: [0, 99], movMax: [0, 99], tormento: [0, 10], fisico: [1, 4], influencia: [1, 4], tecnica: [1, 4], vontade: [0, 99], vontadeMax: [1, 99], medo: [0, 99], medoMax: [1, 99] };
 function setFichaCampo(f, key, value) {
   const parts = String(key).split(".");
@@ -132,6 +176,7 @@ function setFichaCampo(f, key, value) {
     if (a in FICHA_STR) { f[a] = str(value, FICHA_STR[a]); if (a === "nome" && !f.nome.trim()) f.nome = "Sem nome"; return; }
     if (a in FICHA_NUM) { const [mn, mx] = FICHA_NUM[a]; f[a] = int(value, mn, mx, f[a]); return; }
     if (a === "desviando") { f.desviando = !!value; return; }
+    if (a === "retrato") { f.retrato = imgRef(value); return; }
     if (a === "iniciativa") { f.iniciativa = value === null || value === "" ? null : int(value, -99, 999, null); return; }
   }
   if (parts.length === 2 && a === "expertises") { const i = int(b, 0, 5, -1); if (i >= 0 && String(i) === b) { f.expertises[i] = str(value, 120); return; } }
@@ -145,14 +190,27 @@ function setFichaCampo(f, key, value) {
 function novaCriatura(dados) {
   const pvMax = int(dados.pvMax, 1, 9999, 20);
   return { id: "c" + rid(), nome: str(dados.nome, 60) || "Criatura", pv: int(dados.pv, -999, 9999, pvMax), pvMax, caBase: int(dados.caBase, 0, 50, 8),
-    tecnica: int(dados.tecnica, 1, 4, 1), oculto: dados.oculto !== false, desviando: false, iniciativa: null, notas: str(dados.notas, 2000), criadoEm: now() };
+    tecnica: int(dados.tecnica, 1, 4, 1), oculto: dados.oculto !== false, desviando: false, iniciativa: null, notas: str(dados.notas, 2000),
+    imagem: dados.imagem ? imgRef(dados.imagem) : "", criadoEm: now() };
 }
+function novaCena(dados) {
+  return { id: "s" + rid(), nome: str(dados.nome, 60) || "Nova cena", mapa: dados.mapa ? imgRef(dados.mapa) : "", grade: !!dados.grade, tokens: [], criadaEm: now() };
+}
+function cenaDe(sala, id) { const c = (sala.cenas || []).find(x => x.id === id); if (!c) throw new Erro(404, "Cena não encontrada."); return c; }
+function refValida(sala, ref) {
+  const [t, id] = String(ref).split(":");
+  if (t === "ficha" && sala.fichas[id]) return `ficha:${id}`;
+  if (t === "criatura" && sala.criaturas[id]) return `criatura:${id}`;
+  throw new Erro(404, "Personagem não encontrado.");
+}
+const pos = v => clamp(Number(v) || 0, 0, 1);
 const CRIA_STR = { nome: 60, notas: 2000 };
 const CRIA_NUM = { pv: [-999, 9999], pvMax: [1, 9999], caBase: [0, 50], tecnica: [1, 4] };
 function setCriaturaCampo(cr, key, value) {
   if (key in CRIA_STR) { cr[key] = str(value, CRIA_STR[key]) || (key === "nome" ? "Criatura" : ""); return; }
   if (key in CRIA_NUM) { const [mn, mx] = CRIA_NUM[key]; cr[key] = int(value, mn, mx, cr[key]); return; }
   if (key === "oculto" || key === "desviando") { cr[key] = !!value; return; }
+  if (key === "imagem") { cr.imagem = imgRef(value); return; }
   if (key === "iniciativa") { cr.iniciativa = value === null || value === "" ? null : int(value, -99, 999, null); return; }
   throw new Erro(400, "Campo desconhecido: " + key);
 }
@@ -172,11 +230,17 @@ function novaSala(uid, nome, modelo) {
   const sala = {
     codigo, nome: str(nome, 60) || "Mesa de Colisão", mestre: uid, jogadores: [], criadaEm: now(),
     fichas: {}, criaturas: {}, combate: { ativo: false, rodada: 0, turnoId: null },
-    rolagens: [], pistas: [], destaque: null, roteiro: { cenas: [], npcs: [], falas: [] },
+    rolagens: [], pistas: [], destaque: null, roteiro: { cenas: [], npcs: [], falas: [] }, cenas: [], cenaAtiva: null,
   };
   if (modelo === "vale") {
     sala.roteiro = sanitizeRoteiro(SEED.roteiro);
-    for (const c of SEED.criaturas) { const cr = novaCriatura(c); sala.criaturas[cr.id] = cr; }
+    const criadas = SEED.criaturas.map(c => { const cr = novaCriatura(c); sala.criaturas[cr.id] = cr; return cr; });
+    for (const sc of SEED.cenas || []) {
+      const cena = novaCena(sc);
+      for (const t of sc.tokens || []) { const cr = criadas[t.criatura]; if (cr) cena.tokens.push({ id: "t" + rid(), ref: `criatura:${cr.id}`, x: t.x, y: t.y, tam: t.tam || 1, visivel: !!t.visivel }); }
+      sala.cenas.push(cena);
+    }
+    sala.cenaAtiva = sala.cenas[0]?.id || null;
   }
   DB.salas[codigo] = sala;
   return sala;
@@ -189,17 +253,21 @@ function viewFor(sala, uid) {
   const membros = [sala.mestre, ...sala.jogadores].map(id => ({ id, usuario: DB.users[id]?.usuario || "?", mestre: id === sala.mestre }));
   const fichas = Object.values(sala.fichas).map(f => {
     if (gm || f.dono === uid) return f;
-    const { id, dono, nome, pv, pvMax, caBase, desviando, medo, medoMax, vontade, vontadeMax, iniciativa, tecnica, criadoEm } = f;
-    return { id, dono, nome, pv, pvMax, caBase, desviando, medo, medoMax, vontade, vontadeMax, iniciativa, tecnica, criadoEm, resumo: true };
+    const { id, dono, nome, pv, pvMax, caBase, desviando, medo, medoMax, vontade, vontadeMax, iniciativa, tecnica, criadoEm, retrato, aparencia } = f;
+    return { id, dono, nome, pv, pvMax, caBase, desviando, medo, medoMax, vontade, vontadeMax, iniciativa, tecnica, criadoEm, retrato, aparencia, resumo: true };
   });
   const criaturas = Object.values(sala.criaturas).map(c => {
     if (gm || !c.oculto) return gm ? c : { ...c, notas: "" };
-    return { id: c.id, nome: c.nome, oculto: true, pv: bucketPv(c), pvMax: 4, caBase: null, desviando: c.desviando, iniciativa: c.iniciativa, criadoEm: c.criadoEm };
+    return { id: c.id, nome: c.nome, oculto: true, pv: bucketPv(c), pvMax: 4, caBase: null, desviando: c.desviando, iniciativa: c.iniciativa, imagem: c.imagem, criadoEm: c.criadoEm };
   });
+  // Players veem só a cena ativa, e só os tokens visíveis
+  const todas = sala.cenas || [];
+  const cenas = gm ? todas : todas.filter(c => c.id === sala.cenaAtiva).map(c => ({ ...c, tokens: c.tokens.filter(t => t.visivel) }));
   return {
     codigo: sala.codigo, nome: sala.nome, souMestre: gm, eu: uid, membros, fichas, criaturas, combate: sala.combate,
     rolagens: sala.rolagens.filter(r => gm || !r.soMestre || r.by === uid), pistas: sala.pistas, destaque: sala.destaque,
     roteiro: gm ? sala.roteiro : null, online: [...(conns.get(sala.codigo) || [])].length,
+    cenas, cenaAtiva: sala.cenaAtiva || null,
   };
 }
 
@@ -283,12 +351,18 @@ function acao(sala, user, body) {
     case "ficha.apagar": {
       const f = entidade(sala, "ficha", body.id);
       if (!podeEditarFicha(sala, uid, f)) throw new Erro(403, "Você só pode apagar a sua ficha.");
-      delete sala.fichas[f.id]; break;
+      delete sala.fichas[f.id];
+      for (const c of sala.cenas || []) c.tokens = c.tokens.filter(t => t.ref !== `ficha:${f.id}`);
+      break;
     }
     case "ficha.dono": { soMestre(); const f = entidade(sala, "ficha", body.id); const novo = String(body.dono || ""); if (novo && novo !== sala.mestre && !sala.jogadores.includes(novo)) throw new Erro(400, "Essa pessoa não está na sala."); f.dono = novo || sala.mestre; break; }
     case "criatura.criar": { soMestre(); if (Object.keys(sala.criaturas).length >= 60) throw new Erro(400, "Criaturas demais na sala."); const c = novaCriatura(body); sala.criaturas[c.id] = c; break; }
     case "criatura.atualizar": { soMestre(); const c = entidade(sala, "criatura", body.id); for (const [k, v] of Object.entries(body.campos || {}).slice(0, 20)) setCriaturaCampo(c, k, v); break; }
-    case "criatura.apagar": { soMestre(); delete sala.criaturas[body.id]; break; }
+    case "criatura.apagar": {
+      soMestre(); delete sala.criaturas[body.id];
+      for (const c of sala.cenas || []) c.tokens = c.tokens.filter(t => t.ref !== `criatura:${body.id}`);
+      break;
+    }
     case "ajustar": {
       const t = body.alvo === "criatura" ? "criatura" : "ficha", e = entidade(sala, t, body.id);
       if (t === "criatura" ? !gm : !podeEditarFicha(sala, uid, e)) throw new Erro(403, "Você não pode mexer nesse personagem.");
@@ -382,6 +456,47 @@ function acao(sala, user, body) {
       break;
     }
     case "sala.renomear": soMestre(); sala.nome = str(body.nome, 60) || sala.nome; break;
+
+    // ---- cenas e tokens (aba Mesa)
+    case "cena.criar": {
+      soMestre(); sala.cenas = sala.cenas || [];
+      if (sala.cenas.length >= 30) throw new Erro(400, "A sala já tem cenas demais.");
+      const c = novaCena(body); sala.cenas.push(c); if (!sala.cenaAtiva) sala.cenaAtiva = c.id; resposta.id = c.id; break;
+    }
+    case "cena.atualizar": {
+      soMestre(); const c = cenaDe(sala, body.id), k = body.campos || {};
+      if ("nome" in k) c.nome = str(k.nome, 60) || c.nome;
+      if ("mapa" in k) c.mapa = imgRef(k.mapa);
+      if ("grade" in k) c.grade = !!k.grade;
+      break;
+    }
+    case "cena.apagar": {
+      soMestre(); sala.cenas = (sala.cenas || []).filter(c => c.id !== body.id);
+      if (sala.cenaAtiva === body.id) sala.cenaAtiva = sala.cenas[0]?.id || null; break;
+    }
+    case "cena.ativar": soMestre(); sala.cenaAtiva = cenaDe(sala, body.id).id; break;
+    case "token.colocar": {
+      soMestre(); const c = cenaDe(sala, body.cena), ref = refValida(sala, body.ref);
+      if (c.tokens.some(t => t.ref === ref)) throw new Erro(400, "Esse personagem já está na cena.");
+      if (c.tokens.length >= 60) throw new Erro(400, "Tokens demais nesta cena.");
+      c.tokens.push({ id: "t" + rid(), ref, x: pos(body.x ?? .5), y: pos(body.y ?? .5), tam: 1, visivel: body.visivel !== false }); break;
+    }
+    case "token.mover": {
+      const c = cenaDe(sala, body.cena), t = c.tokens.find(x => x.id === body.token);
+      if (!t) throw new Erro(404, "Token não encontrado.");
+      const [tipo, eid] = t.ref.split(":");
+      const dono = tipo === "ficha" && sala.fichas[eid]?.dono === uid;
+      if (!gm && !(dono && sala.cenaAtiva === c.id && t.visivel)) throw new Erro(403, "Você só pode mover o seu personagem.");
+      t.x = pos(body.x); t.y = pos(body.y); break;
+    }
+    case "token.ajustar": {
+      soMestre(); const c = cenaDe(sala, body.cena), t = c.tokens.find(x => x.id === body.token);
+      if (!t) throw new Erro(404, "Token não encontrado.");
+      if ("visivel" in body) t.visivel = !!body.visivel;
+      if ("tam" in body) t.tam = clamp(Number(body.tam) || 1, 0.5, 4);
+      break;
+    }
+    case "token.remover": { soMestre(); const c = cenaDe(sala, body.cena); c.tokens = c.tokens.filter(t => t.id !== body.token); break; }
     case "sala.apagar": {
       soMestre(); delete DB.salas[sala.codigo];
       for (const c of [...(conns.get(sala.codigo) || [])]) { sse(c.res, "fim", { motivo: "A sala foi apagada." }); c.res.end(); }
@@ -394,7 +509,7 @@ function acao(sala, user, body) {
 }
 
 // ---------------------------------------------------------------- HTTP
-const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".png": "image/png", ".mp3": "audio/mpeg", ".pdf": "application/pdf", ".json": "application/json", ".ico": "image/x-icon", ".svg": "image/svg+xml" };
+const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".mp3": "audio/mpeg", ".pdf": "application/pdf", ".json": "application/json", ".ico": "image/x-icon", ".svg": "image/svg+xml" };
 function send(res, status, obj) { res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); }
 function readBody(req, limit) {
   return new Promise((resolve, reject) => {
@@ -484,7 +599,13 @@ const server = http.createServer(async (req, res) => {
       if (sala.mestre !== u.id && !sala.jogadores.includes(u.id)) { if (sala.jogadores.length >= 12) throw new Erro(400, "A sala está cheia."); sala.jogadores.push(u.id); persist(); push(codigo); }
       return send(res, 200, { codigo });
     }
-    const mm = /^\/api\/salas\/([A-Za-z0-9]{4,10})\/(eventos|acao|fala-audio|sair)$/.exec(p) || /^\/api\/salas\/([A-Za-z0-9]{4,10})\/(audio)\/([A-Za-z0-9]{4,20})$/.exec(p);
+    const mi = /^\/api\/img\/([A-Za-z0-9]{12,32})$/.exec(p);
+    if (mi && m === "GET") {
+      const v = await imgLer(mi[1]); if (!v) throw new Erro(404, "Imagem não encontrada.");
+      res.writeHead(200, { "Content-Type": v.mime, "Content-Length": v.buf.length, "Cache-Control": "private, max-age=604800, immutable" });
+      return res.end(v.buf);
+    }
+    const mm = /^\/api\/salas\/([A-Za-z0-9]{4,10})\/(eventos|acao|fala-audio|sair|imagem)$/.exec(p) || /^\/api\/salas\/([A-Za-z0-9]{4,10})\/(audio)\/([A-Za-z0-9]{4,20})$/.exec(p);
     if (mm) {
       const sala = salaDe(mm[1], u), rota = mm[2];
       if (rota === "eventos" && m === "GET") {
@@ -511,6 +632,16 @@ const server = http.createServer(async (req, res) => {
         broadcast(sala.codigo, "fala", { tipo: "audio", id, grave, dist, eco });
         return send(res, 200, { ok: true, id });
       }
+      if (rota === "imagem" && m === "POST") {
+        const mime = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+        if (!IMG_MIME[mime]) throw new Erro(415, "Envie uma imagem PNG, JPG, WEBP ou GIF.");
+        sala.imagens = (sala.imagens || 0) + 1;
+        if (sala.imagens > 500) throw new Erro(400, "Esta sala já enviou imagens demais.");
+        const buf = await readBody(req, 4 * 1024 * 1024); if (buf.length < 50) throw new Erro(400, "A imagem veio vazia.");
+        const id = rid(20);
+        try { await imgSalvar(id, buf, mime); } catch (e) { console.error(e.message); throw new Erro(502, "Não consegui guardar a imagem. Tente de novo."); }
+        persist(); return send(res, 200, { ref: "u:" + id });
+      }
       if (rota === "audio" && m === "GET") {
         const c = clips.get(mm[3]); if (!c || c.codigo !== sala.codigo) throw new Erro(404, "Essa fala já expirou.");
         res.writeHead(200, { "Content-Type": c.mime, "Content-Length": c.buf.length, "Cache-Control": "private, max-age=3600" }); return res.end(c.buf);
@@ -527,5 +658,5 @@ const server = http.createServer(async (req, res) => {
 async function shutdown() { console.log("Salvando antes de desligar…"); try { await flush(); } catch (e) {} process.exit(0); }
 process.on("SIGTERM", shutdown); process.on("SIGINT", shutdown);
 
-load().then(() => server.listen(PORT, () => console.log(`Mesa Colisão rodando na porta ${PORT}`)))
+load().then(garantirBucket).then(() => server.listen(PORT, () => console.log(`Mesa Colisão rodando na porta ${PORT}`)))
   .catch(() => { console.error("Não foi possível iniciar sem os dados. Confira SUPABASE_URL, SUPABASE_SERVICE_KEY e se a tabela colisao_kv existe."); process.exit(1); });

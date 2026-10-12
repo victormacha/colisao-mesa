@@ -2,6 +2,8 @@
 
 Mesa online para o **Colisão RPG**. O Mestre cria uma sala, manda o código, os players entram, fazem a ficha e jogam juntos em tempo real.
 
+- **Mesa com mapa.** O Mestre cria cenas com mapa (vem pronto o mapa do Vale das Cinzas e o da Igreja velha), coloca os personagens e monstros conforme aparecem, esconde ou revela tokens e escolhe qual cena os players veem. Cada player arrasta o próprio token.
+- **Aparência.** Cada player envia a imagem do personagem, que vira o token. O Mestre envia imagens para as criaturas (o Aquele que Responde já vem com a dele).
 - **Contas com login.** Cada pessoa cria usuário e senha. A sessão fica salva por 30 dias.
 - **Salas com código.** O Mestre cria a sala e manda o código de 6 letras ou o link de convite.
 - **Fichas salvas.** Cada player faz a ficha completa (identificação, PV, Couraça, Movimento, Tormento, atributos, expertises, chamado, estados, Vontade, Medo, talentos, rituais, habilidades). O Mestre vê e edita todas.
@@ -53,7 +55,7 @@ Se preferir criar na mão: **New > Web Service**, escolha o repositório, Runtim
 
 - **Primeira abertura lenta.** Depois de 15 minutos sem ninguém, o Render desliga o servidor. A primeira pessoa a abrir espera uns 50 segundos. Durante a sessão ele fica ligado.
 - **Supabase pausa sem uso.** Projetos grátis pausam depois de uma semana parados. É só entrar no painel do Supabase e clicar em **Restore**.
-- **Falas gravadas** ficam só na memória por 1 hora. Fichas, salas e roteiro ficam salvos no Supabase.
+- **Falas gravadas** ficam só na memória por 1 hora. Fichas, salas, cenas e roteiro ficam salvos no banco do Supabase, e as imagens enviadas ficam no Storage do Supabase (o servidor cria o bucket `colisao` sozinho).
 
 ---
 
@@ -74,6 +76,7 @@ Se preferir criar na mão: **New > Web Service**, escolha o repositório, Runtim
 | `public/app.js` | Todo o app do navegador |
 | `public/app.css` | O visual |
 | `public/ficha.pdf` | A ficha oficial com campos, usada para gerar o PDF |
+| `public/mapas/`, `public/tokens/` | Mapas do Vale das Cinzas e da Igreja velha, e o token do Aquele que Responde (arte original feita para esta mesa) |
 | `public/sons/` | Vozes do monstro, sino, ambiente, batimento e rosnado |
 | `seed-vale-das-cinzas.json` | Roteiro, falas e a criatura da sessão Vale das Cinzas |
 | `supabase.sql` | Cria a tabela no Supabase |

@@ -148,11 +148,13 @@ $("#btn-convite").addEventListener("click", async () => {
 
 function prepararSala() {
   const tabs = gm()
-    ? [["combate", "Combate"], ["fichas", "Fichas"], ["roteiro", "Roteiro"], ["trilha", "Trilha e falas"], ["jogadores", "Jogadores"], ["dados", "Dados", "side-tab"]]
-    : [["combate", "Combate"], ["fichas", "Minha ficha"], ["pistas", "Pistas"], ["dados", "Dados", "side-tab"]];
+    ? [["mesa", "Mesa"], ["combate", "Combate"], ["fichas", "Fichas"], ["roteiro", "Roteiro"], ["trilha", "Trilha e falas"], ["jogadores", "Jogadores"], ["dados", "Dados", "side-tab"]]
+    : [["mesa", "Mesa"], ["combate", "Combate"], ["fichas", "Minha ficha"], ["pistas", "Pistas"], ["dados", "Dados", "side-tab"]];
+  $(".mesa-split").classList.toggle("gm", gm());
+  S.cenaSel = null; S.zoom = 1; S.tkSel = null; mapaSrcAtual = null;
   $("#tabs").innerHTML = tabs.map(([k, n, c]) => `<button class="tab ${c || ""}" role="tab" data-tab="${k}" type="button">${n}</button>`).join("");
-  const salvo = store.get("colisao-tab", "combate");
-  setTab(tabs.some(t => t[0] === salvo) ? salvo : "combate");
+  const salvo = store.get("colisao-tab", "mesa");
+  setTab(tabs.some(t => t[0] === salvo) ? salvo : "mesa");
   $("#secret-wrap").hidden = !gm(); $("#btn-clear-log").hidden = !gm();
   $("#t-tal").innerHTML = `<option value="">Sem talento (1 dado)</option>` + TALENTOS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
   if (gm()) renderTrilha();
@@ -160,13 +162,14 @@ function prepararSala() {
 function setTab(t) {
   S.tab = t; store.set("colisao-tab", t);
   $$(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
-  ["combate", "fichas", "roteiro", "pistas", "trilha", "jogadores", "dados"].forEach(k => { $("#pane-" + k).hidden = k !== t; });
+  ["mesa", "combate", "fichas", "roteiro", "pistas", "trilha", "jogadores", "dados"].forEach(k => { $("#pane-" + k).hidden = k !== t; });
+  if (t === "mesa") requestAnimationFrame(ajustarMapa);
 }
 $("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) { setTab(b.dataset.tab); if (b.dataset.tab === "fichas") renderFichas(true); } });
 
 // ================================================================ sala: render
 function renderSala() {
-  renderTopo(); renderSpot(); renderCombate(); renderFichas(); renderLog(); renderTray();
+  renderTopo(); renderSpot(); renderMesa(); renderCombate(); renderFichas(); renderLog(); renderTray();
   if (gm()) { renderRoteiro(); renderFalas(); renderJogadores(); } else renderPistas();
 }
 function renderTopo() {
@@ -209,7 +212,7 @@ function cardHTML(e) {
   const turno = c.ativo && c.turnoId === e.id, meu = e.tipo === "ficha" && e.dono === S.me?.id;
   const medo = num(e.medo), medoMax = num(e.medoMax, 10), vont = num(e.vontade, 10), vontMax = num(e.vontadeMax, 10);
   let h = `<article class="cb t-${e.tipo}${turno ? " turn" : ""}${pv <= 0 && !hide ? " down" : ""}" data-id="${esc(e.id)}" data-tipo="${e.tipo}">`;
-  h += `<div class="cb-head"><span class="cb-name">${esc(e.nome)}${meu ? `<small class="me">você</small>` : e.tipo === "ficha" && gm() ? `<small>${esc(nomeMembro(e.dono))}</small>` : ""}</span>`;
+  h += `<div class="cb-head">${avatarHTML(e, "cb-av")}<span class="cb-name">${esc(e.nome)}${meu ? `<small class="me">você</small>` : e.tipo === "ficha" && gm() ? `<small>${esc(nomeMembro(e.dono))}</small>` : ""}</span>`;
   if (turno) h += `<span class="turn-tag">VEZ</span>`;
   if (e.iniciativa != null) h += `<span class="chip mono" title="Iniciativa">Init ${esc(e.iniciativa)}</span>`;
   if (e.desviando) h += `<span class="badge dodge">DESVIANDO</span>`;
@@ -243,6 +246,7 @@ function cardHTML(e) {
         <label><span class="lbl">Couraça base</span><input type="number" data-cf="caBase" value="${num(e.caBase, 8)}"></label>
         <label><span class="lbl">Técnica</span><select data-cf="tecnica">${[1, 2, 3, 4].map(n => `<option value="${n}" ${num(e.tecnica, 1) === n ? "selected" : ""}>${n} · d${DIE[n]}</option>`).join("")}</select></label>
       </div><label class="f" style="margin-top:8px"><span class="lbl">Notas do Mestre</span><textarea data-cf="notas" maxlength="2000">${esc(e.notas)}</textarea></label>
+      <div class="row" style="margin-top:8px"><button class="btn sm" type="button" data-act="img-criatura">${e.imagem ? "Trocar imagem" : "Enviar imagem"}</button>${e.imagem ? `<button class="btn sm ghost" type="button" data-act="img-criatura-tirar">Tirar imagem</button>` : ""}</div>
       <div class="row" style="margin-top:8px"><button class="btn sm" type="button" data-act="ocultar">${e.oculto ? "Mostrar números aos players" : "Esconder números dos players"}</button><button class="btn sm danger" type="button" data-act="remover-criatura">Remover da mesa</button></div></details>`;
     }
   }
@@ -309,6 +313,8 @@ document.addEventListener("click", async ev => {
       case "remover-criatura":
         if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Clique de novo para remover"; return; }
         await acao("criatura.apagar", { id }); break;
+      case "img-criatura": escolherImagem({ max: 512, quadrado: true }, ref => acao("criatura.atualizar", { id, campos: { imagem: ref } })); break;
+      case "img-criatura-tirar": await acao("criatura.atualizar", { id, campos: { imagem: "" } }); break;
       case "add-criatura": S.addOpen = "criatura"; renderAdd(); break;
       case "add-cancel": S.addOpen = null; renderAdd(); break;
       case "iniciar": await acao("combate.iniciar"); break;
@@ -318,6 +324,227 @@ document.addEventListener("click", async ev => {
       case "spot-off": await acao("destaque", { ativo: false }); break;
     }
   } catch (e) { /* toast já mostrado */ }
+});
+
+// ================================================================ imagens
+function imgSrc(ref) {
+  if (!ref) return "";
+  if (ref.startsWith("b:")) return ref.slice(2);
+  if (ref.startsWith("u:")) return "/api/img/" + encodeURIComponent(ref.slice(2));
+  return "";
+}
+const iniciais = n => String(n || "?").trim().split(/\s+/).slice(0, 2).map(p => p[0]).join("").toUpperCase();
+function avatarHTML(e, cls) {
+  const src = imgSrc(e.tipo === "criatura" ? e.imagem : e.retrato);
+  return `<span class="${cls}${e.tipo === "criatura" ? " c" : ""}" style="${src ? `background-image:url('${esc(src)}')` : ""}" aria-hidden="true">${src ? "" : esc(iniciais(e.nome))}</span>`;
+}
+async function prepararImagem(file, { max = 1600, quadrado = false } = {}) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error("Não consegui abrir essa imagem.")); i.src = url; });
+    let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+    if (quadrado) { const m = Math.min(sw, sh); sx = (sw - m) / 2; sy = (sh - m) / 2; sw = sh = m; }
+    const k = Math.min(1, max / Math.max(sw, sh)), cv = document.createElement("canvas");
+    cv.width = Math.max(1, Math.round(sw * k)); cv.height = Math.max(1, Math.round(sh * k));
+    cv.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+    const blob = (t, q) => new Promise(ok => cv.toBlob(ok, t, q));
+    let b = await blob("image/webp", .86);
+    if (!b || b.type !== "image/webp") b = await blob(quadrado ? "image/png" : "image/jpeg", .86);
+    if (b.size > 3.8 * 1024 * 1024) b = await blob("image/jpeg", .7);
+    return b;
+  } finally { URL.revokeObjectURL(url); }
+}
+let aoEscolher = null, opcoesImg = null;
+function escolherImagem(opcoes, cb) { aoEscolher = cb; opcoesImg = opcoes; const inp = $("#up-file"); inp.value = ""; inp.click(); }
+$("#up-file").addEventListener("change", async e => {
+  const file = e.target.files?.[0], cb = aoEscolher; aoEscolher = null; if (!file || !cb) return;
+  toast("Enviando a imagem…");
+  try {
+    const blob = await prepararImagem(file, opcoesImg || {});
+    const r = await fetch(`/api/salas/${S.codigo}/imagem`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": blob.type }, body: blob });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.erro || "Não consegui enviar a imagem.");
+    await cb(data.ref); toast("Imagem salva.");
+  } catch (er) { toast(er.message); }
+});
+
+// ================================================================ mesa (mapa e tokens)
+let mapaSrcAtual = null;
+const MAPAS_PRONTOS = [["b:/mapas/vale-das-cinzas.jpg", "Vale das Cinzas (pronto)"], ["b:/mapas/igreja-velha.jpg", "Igreja velha (pronto)"]];
+function cenaMostrada() {
+  const s = S.sala; if (!s) return null;
+  if (!gm()) return s.cenas[0] || null;
+  if (!s.cenas.find(c => c.id === S.cenaSel)) S.cenaSel = s.cenaAtiva || s.cenas[0]?.id || null;
+  return s.cenas.find(c => c.id === S.cenaSel) || null;
+}
+function entPorRef(ref) {
+  const [t, id] = String(ref).split(":");
+  const e = t === "ficha" ? S.sala.fichas.find(f => f.id === id) : S.sala.criaturas.find(c => c.id === id);
+  return e ? { ...e, tipo: t } : null;
+}
+function renderMesa() {
+  if (!S.sala) return;
+  const cena = cenaMostrada();
+  renderMesaBar(cena); renderMapa(cena); renderMesaSide(cena);
+}
+function renderMesaBar(cena) {
+  const bar = $("#mesa-bar");
+  if (!gm()) {
+    bar.className = ""; bar.innerHTML = cena ? `<div class="row"><h3 class="sec" style="font-size:24px">${esc(cena.nome)}</h3></div>` : "";
+    return;
+  }
+  if (emFoco(bar)) return;
+  bar.className = "mesa-bar";
+  const s = S.sala, ativa = cena && cena.id === s.cenaAtiva;
+  if (S.novaCena) {
+    bar.innerHTML = `<form id="form-cena" class="row" style="flex:1"><input type="text" name="nome" maxlength="60" required placeholder="Nome da cena" style="flex:1;min-width:140px">
+      <select name="mapa" aria-label="Mapa">${MAPAS_PRONTOS.map(([v, n]) => `<option value="${v}">${n}</option>`).join("")}<option value="">Sem mapa (envio depois)</option></select>
+      <label class="check"><input type="checkbox" name="grade"> Grade</label><button class="btn pri sm" type="submit">Criar cena</button><button class="btn ghost sm" type="button" data-mesa="cancelar">Cancelar</button></form>`;
+    return;
+  }
+  bar.innerHTML = s.cenas.length ? `<select id="cena-sel" aria-label="Cena">${s.cenas.map(c => `<option value="${esc(c.id)}" ${cena && c.id === cena.id ? "selected" : ""}>${esc(c.nome)}${c.id === s.cenaAtiva ? " · players veem" : ""}</option>`).join("")}</select>
+    ${ativa ? `<span class="badge live">OS PLAYERS VEEM ESTA</span>` : `<button class="btn pri sm" type="button" data-mesa="ativar">Mostrar aos players</button>`}
+    <button class="btn sm" type="button" data-mesa="mapa">Trocar mapa</button>
+    <button class="btn sm" type="button" data-mesa="grade" aria-pressed="${!!cena?.grade}">Grade</button>
+    <button class="btn sm ghost" type="button" data-mesa="renomear">Renomear</button>
+    <button class="btn sm ghost danger" type="button" data-mesa="apagar">Apagar cena</button>
+    <button class="btn sm" type="button" data-mesa="nova" style="margin-left:auto">+ Nova cena</button>`
+    : `<span style="color:var(--ash)">Nenhuma cena ainda.</span><button class="btn pri sm" type="button" data-mesa="nova">+ Nova cena</button>`;
+}
+function renderMapa(cena) {
+  const img = $("#mapa-img"), vazio = $("#mapa-vazio"), mapa = $("#mapa");
+  if (!cena) {
+    mapa.hidden = true; vazio.hidden = false;
+    vazio.textContent = gm() ? "Crie uma cena para colocar um mapa." : "O Mestre ainda não mostrou nenhuma cena.";
+    $("#mapa-dica").textContent = ""; return;
+  }
+  mapa.hidden = false;
+  const src = imgSrc(cena.mapa);
+  vazio.hidden = !!src; if (!src) vazio.textContent = gm() ? "Esta cena ainda não tem mapa. Use Trocar mapa para enviar uma imagem." : "Sem mapa nesta cena.";
+  if (src !== mapaSrcAtual) { mapaSrcAtual = src; img.hidden = !src; if (src) { img.src = src; img.onload = ajustarMapa; } else { img.removeAttribute("src"); } }
+  $("#mapa-grade").hidden = !cena.grade;
+  $("#mapa-dica").textContent = gm() ? "Arraste os tokens. Clique num token para ajustar." : (meuToken(cena) ? "Arraste o seu token para mover." : "");
+  renderTokens(cena);
+  ajustarMapa();
+}
+function meuToken(cena) { return cena?.tokens.find(t => { const e = entPorRef(t.ref); return e && e.tipo === "ficha" && e.dono === S.me?.id; }); }
+let arrastando = null;
+function renderTokens(cena) {
+  if (arrastando) return;
+  const c = S.sala.combate || {};
+  $("#mapa-tokens").innerHTML = cena.tokens.map(t => {
+    const e = entPorRef(t.ref); if (!e) return "";
+    const src = imgSrc(e.tipo === "criatura" ? e.imagem : e.retrato);
+    const meu = e.tipo === "ficha" && e.dono === S.me?.id, pode = gm() || meu;
+    const cls = ["tk", "t-" + e.tipo, meu ? "meu" : "", !t.visivel ? "oculto" : "", S.tkSel === t.id ? "sel" : "", c.ativo && c.turnoId === e.id ? "turno" : "", num(e.pv, 1) <= 0 && !(e.oculto && !gm()) ? "caido" : ""].filter(Boolean).join(" ");
+    return `<div class="${cls}" data-tk="${esc(t.id)}" ${pode ? "data-drag" : ""} style="left:${num(t.x) * 100}%;top:${num(t.y) * 100}%;--t:${num(t.tam, 1)}" title="${esc(e.nome)}">
+      <div class="tk-img" style="${src ? `background-image:url('${esc(src)}')` : ""}">${src ? "" : esc(iniciais(e.nome))}</div><span class="tk-nome">${esc(e.nome)}</span></div>`;
+  }).join("");
+}
+function ajustarMapa() {
+  const wrap = $("#mapa-wrap"), mapa = $("#mapa"), img = $("#mapa-img"); if (!wrap || mapa.hidden) return;
+  const larg = Math.max(200, wrap.clientWidth - 2) * (S.zoom || 1);
+  mapa.style.width = larg + "px";
+  if (!img.getAttribute("src")) mapa.style.height = Math.round(larg * 0.62) + "px"; else mapa.style.height = "";
+  mapa.style.setProperty("--tk", (larg * 0.025) + "px");
+  const cel = larg * 0.025; $("#mapa-grade").style.backgroundSize = `${cel}px ${cel}px`;
+}
+window.addEventListener("resize", () => { if (S.tab === "mesa") ajustarMapa(); });
+$("#pane-mesa").addEventListener("click", e => {
+  const z = e.target.closest("[data-zoom]"); if (!z) return;
+  const d = num(z.dataset.zoom), wrap = $("#mapa-wrap");
+  const cx = (wrap.scrollLeft + wrap.clientWidth / 2) / Math.max(1, wrap.scrollWidth), cy = (wrap.scrollTop + wrap.clientHeight / 2) / Math.max(1, wrap.scrollHeight);
+  S.zoom = d === 0 ? 1 : clamp((S.zoom || 1) * (d > 0 ? 1.25 : 0.8), 0.5, 4);
+  ajustarMapa();
+  wrap.scrollLeft = cx * wrap.scrollWidth - wrap.clientWidth / 2; wrap.scrollTop = cy * wrap.scrollHeight - wrap.clientHeight / 2;
+});
+// Arrastar tokens e mover o mapa
+(() => {
+  const wrap = $("#mapa-wrap"); let pan = null;
+  wrap.addEventListener("pointerdown", e => {
+    const tk = e.target.closest(".tk");
+    if (tk && tk.hasAttribute("data-drag")) {
+      e.preventDefault(); tk.setPointerCapture(e.pointerId);
+      arrastando = { el: tk, id: tk.dataset.tk, x0: e.clientX, y0: e.clientY, moveu: false };
+      return;
+    }
+    if (tk && gm()) { S.tkSel = tk.dataset.tk; renderMesa(); return; }
+    pan = { x: e.clientX, y: e.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop }; wrap.classList.add("pan"); wrap.setPointerCapture(e.pointerId);
+  });
+  wrap.addEventListener("pointermove", e => {
+    if (arrastando) {
+      if (Math.abs(e.clientX - arrastando.x0) + Math.abs(e.clientY - arrastando.y0) > 4) arrastando.moveu = true;
+      if (!arrastando.moveu) return;
+      const r = $("#mapa").getBoundingClientRect();
+      arrastando.fx = clamp((e.clientX - r.left) / r.width, 0, 1); arrastando.fy = clamp((e.clientY - r.top) / r.height, 0, 1);
+      arrastando.el.style.left = arrastando.fx * 100 + "%"; arrastando.el.style.top = arrastando.fy * 100 + "%";
+    } else if (pan) { wrap.scrollLeft = pan.sl - (e.clientX - pan.x); wrap.scrollTop = pan.st - (e.clientY - pan.y); }
+  });
+  const fim = async () => {
+    if (arrastando) {
+      const a = arrastando; arrastando = null;
+      const cena = cenaMostrada();
+      if (!a.moveu) { if (gm()) { S.tkSel = a.id; renderMesa(); } return; }
+      if (cena) await acao("token.mover", { cena: cena.id, token: a.id, x: a.fx, y: a.fy }).catch(() => renderMesa());
+    }
+    if (pan) { pan = null; wrap.classList.remove("pan"); }
+  };
+  wrap.addEventListener("pointerup", fim); wrap.addEventListener("pointercancel", fim);
+  wrap.addEventListener("wheel", e => { if (!e.ctrlKey) return; e.preventDefault(); S.zoom = clamp((S.zoom || 1) * (e.deltaY < 0 ? 1.1 : 0.9), 0.5, 4); ajustarMapa(); }, { passive: false });
+})();
+function renderMesaSide(cena) {
+  const side = $("#mesa-side");
+  if (!gm() || !cena) { side.innerHTML = ""; side.hidden = true; return; }
+  side.hidden = false;
+  const naCena = cena.tokens.map(t => ({ t, e: entPorRef(t.ref) })).filter(x => x.e);
+  const refs = new Set(cena.tokens.map(t => t.ref));
+  const fora = [...S.sala.fichas.map(f => ({ ...f, tipo: "ficha" })), ...S.sala.criaturas.map(c => ({ ...c, tipo: "criatura" }))].filter(e => !refs.has(`${e.tipo}:${e.id}`));
+  side.innerHTML = `<div class="card"><span class="lbl">Na cena</span>${naCena.length ? naCena.map(({ t, e }) => `<div class="tk-row${S.tkSel === t.id ? " sel" : ""}" data-tkrow="${esc(t.id)}">${avatarHTML(e, "av")}<span class="n">${esc(e.nome)}</span>
+      <button class="btn sm ghost" type="button" data-tka="ver" title="${t.visivel ? "Esconder dos players" : "Mostrar aos players"}" aria-label="${t.visivel ? "Esconder dos players" : "Mostrar aos players"}">${t.visivel ? "Visível" : "Oculto"}</button></div>
+      ${S.tkSel === t.id ? `<div class="row" style="padding:0 0 6px 38px"><span class="lbl">Tamanho</span><span class="step"><button type="button" data-tka="menor" aria-label="Diminuir">−</button><span class="mono">${num(t.tam, 1)}</span><button type="button" data-tka="maior" aria-label="Aumentar">+</button></span><button class="btn sm ghost danger" type="button" data-tka="tirar">Tirar</button></div>` : ""}`).join("")
+      : `<p style="margin:0;color:var(--ash);font-size:13px">Ninguém nesta cena ainda.</p>`}</div>
+    <div class="card"><span class="lbl">Colocar na cena</span>${fora.length ? fora.map(e => `<div class="tk-row">${avatarHTML(e, "av")}<span class="n">${esc(e.nome)}</span><button class="btn sm" type="button" data-colocar="${e.tipo}:${esc(e.id)}" data-vis="1">Colocar</button><button class="btn sm ghost" type="button" data-colocar="${e.tipo}:${esc(e.id)}" data-vis="0" title="Colocar escondido dos players">Oculto</button></div>`).join("")
+      : `<p style="margin:0;color:var(--ash);font-size:13px">Todos já estão na cena. Os players aparecem aqui quando criam a ficha.</p>`}</div>`;
+}
+$("#mesa-side").addEventListener("click", async e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const cena = cenaMostrada(); if (!cena) return;
+  if (b.dataset.colocar) {
+    const n = cena.tokens.length, x = .5 + ((n % 5) - 2) * .04, y = .5 + (Math.floor(n / 5) % 3 - 1) * .06;
+    await acao("token.colocar", { cena: cena.id, ref: b.dataset.colocar, x, y, visivel: b.dataset.vis === "1" }).catch(() => {}); return;
+  }
+  const row = b.closest("[data-tkrow]") || b.closest(".row")?.previousElementSibling;
+  const tid = row?.dataset.tkrow || S.tkSel, t = cena.tokens.find(x => x.id === tid); if (!t) return;
+  const a = b.dataset.tka;
+  if (a === "ver") await acao("token.ajustar", { cena: cena.id, token: t.id, visivel: !t.visivel }).catch(() => {});
+  if (a === "menor" || a === "maior") await acao("token.ajustar", { cena: cena.id, token: t.id, tam: clamp(num(t.tam, 1) + (a === "maior" ? .5 : -.5), .5, 4) }).catch(() => {});
+  if (a === "tirar") { await acao("token.remover", { cena: cena.id, token: t.id }).catch(() => {}); S.tkSel = null; }
+});
+$("#mesa-side").addEventListener("click", e => { const r = e.target.closest("[data-tkrow]"); if (r && !e.target.closest("button")) { S.tkSel = r.dataset.tkrow; renderMesa(); } });
+$("#mesa-bar").addEventListener("change", e => { if (e.target.id === "cena-sel") { S.cenaSel = e.target.value; S.tkSel = null; mapaSrcAtual = null; renderMesa(); } });
+$("#mesa-bar").addEventListener("submit", async e => {
+  if (e.target.id !== "form-cena") return; e.preventDefault();
+  const fd = new FormData(e.target);
+  try { const r = await acao("cena.criar", { nome: fd.get("nome"), mapa: fd.get("mapa"), grade: fd.get("grade") === "on" }); S.cenaSel = r.id; S.novaCena = false; mapaSrcAtual = null; renderMesa(); } catch (er) {}
+});
+$("#mesa-bar").addEventListener("click", async e => {
+  const b = e.target.closest("[data-mesa]"); if (!b) return;
+  const cena = cenaMostrada(), a = b.dataset.mesa;
+  if (a === "nova") { S.novaCena = true; renderMesaBar(cena); $("#form-cena input[name=nome]").focus(); return; }
+  if (a === "cancelar") { S.novaCena = false; renderMesaBar(cena); return; }
+  if (!cena) return;
+  if (a === "ativar") await acao("cena.ativar", { id: cena.id }).then(() => toast("Os players agora veem esta cena.")).catch(() => {});
+  if (a === "grade") await acao("cena.atualizar", { id: cena.id, campos: { grade: !cena.grade } }).catch(() => {});
+  if (a === "mapa") escolherImagem({ max: 2600 }, ref => acao("cena.atualizar", { id: cena.id, campos: { mapa: ref } }));
+  if (a === "renomear") {
+    b.outerHTML = `<form id="form-renomear" class="row"><input type="text" value="${esc(cena.nome)}" maxlength="60" aria-label="Novo nome da cena"><button class="btn sm pri" type="submit">Salvar</button></form>`;
+    const f = $("#form-renomear"); f.querySelector("input").focus();
+    f.addEventListener("submit", async ev => { ev.preventDefault(); await acao("cena.atualizar", { id: cena.id, campos: { nome: f.querySelector("input").value } }).catch(() => {}); f.querySelector("input").blur(); renderMesa(); });
+  }
+  if (a === "apagar") {
+    if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Clique de novo para apagar"; return; }
+    await acao("cena.apagar", { id: cena.id }).catch(() => {}); S.cenaSel = null; mapaSrcAtual = null;
+  }
 });
 
 // ================================================================ fichas
@@ -383,6 +610,10 @@ function editorHTML(f) {
     ${inp("estadoCivil", "Estado civil", 'maxlength="40"')}${inp("nascimento", "Data de nascimento", 'maxlength="20" placeholder="dd.mm.aaaa"')}${inp("rota", "Rota", 'maxlength="60"')}${inp("arquivo", "Número do arquivo", 'maxlength="30"')}
     <label class="f"><span class="lbl">Patente</span><input type="number" data-k="patente" min="1" max="10"></label></div></section>
 
+  <section><div class="fe-head"><h4>Aparência</h4><span class="lbl">vira o token na Mesa</span></div><div class="retrato"><div class="retrato-img" data-img="retrato"></div>
+    <div class="pane" style="gap:8px"><div class="row"><button class="btn sm" type="button" data-retrato>Enviar imagem</button><button class="btn sm ghost" type="button" data-retrato-tirar>Tirar imagem</button></div>
+    <textarea data-k="aparencia" maxlength="800" aria-label="Descrição da aparência" placeholder="Rosto, roupas, cicatrizes, o jeito de andar…"></textarea></div></div></section>
+
   <section><div class="fe-head"><h4>Condição</h4></div><div class="vitals">
     <div class="vital"><span class="lbl">Pontos de Vida</span><div class="pair">${numInp("pv", "PV atual")}<span class="slash">/</span>${numInp("pvMax", "PV máximo")}</div><div data-bar="pv"></div></div>
     <div class="vital"><span class="lbl">Couraça</span><div class="pair"><span class="big" data-show="ca"></span><span class="slash">·</span><label class="f"><span class="lbl">Base</span>${numInp("caBase", "Couraça base")}</label></div><button class="btn sm" type="button" data-toggle="desviando">Desviar (+2)</button></div>
@@ -432,6 +663,8 @@ function sincronizarEditor(host, f) {
     const k = el.dataset.show;
     el.textContent = k === "ca" ? String(num(f.caBase, 8) + (f.desviando ? 2 : 0)) : String(valorDe(f, k) ?? "");
   });
+  const ri = $("[data-img=retrato]", host);
+  if (ri) { const src = imgSrc(f.retrato); ri.style.backgroundImage = src ? `url("${src}")` : ""; ri.textContent = src ? "" : "Sem imagem"; }
   const tg = $("[data-toggle=desviando]", host); if (tg) { tg.setAttribute("aria-pressed", !!f.desviando); tg.textContent = f.desviando ? "Desviando +2" : "Desviar (+2)"; }
   $$("[data-tor]", host).forEach(b => b.classList.toggle("on", +b.dataset.tor <= num(f.tormento)));
   const bars = { pv: [f.pv, f.pvMax, ""], vontade: [f.vontade, f.vontadeMax, "will"], medo: [f.medo, f.medoMax, "fear"] };
@@ -470,6 +703,8 @@ $("#pane-fichas").addEventListener("click", async e => {
   if (b.dataset.tstep) { const inp = host.querySelector(`[data-k="talentos.${b.dataset.tstep}"]`); const v = clamp(num(inp.value) + num(b.dataset.d), 0, 10); inp.value = v || ""; enviarCampo(f.id, "talentos." + b.dataset.tstep, v, host); return; }
   if (b.dataset.toggle === "desviando") { await acao("desviar", { alvo: "ficha", id: f.id }).catch(() => {}); return; }
   if (b.hasAttribute("data-pdf")) { baixarPdf(f, b); return; }
+  if (b.hasAttribute("data-retrato")) { escolherImagem({ max: 512, quadrado: true }, ref => acao("ficha.atualizar", { id: f.id, campos: { retrato: ref } })); return; }
+  if (b.hasAttribute("data-retrato-tirar")) { await acao("ficha.atualizar", { id: f.id, campos: { retrato: "" } }).catch(() => {}); return; }
   if (b.hasAttribute("data-apagar-ficha")) {
     if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Clique de novo para apagar"; return; }
     await acao("ficha.apagar", { id: f.id }).catch(() => {}); S.fichaAberta = null; renderFichas(true);
