@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mesa Colisão RPG</title>
+<meta name="description" content="Mesa online para o Colisão RPG: salas com código, fichas salvas, combate, dados, roteiro e trilha sonora em tempo real.">
+<link rel="icon" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<!-- Tela 1: login -->
+<main id="tela-login" class="narrow" hidden>
+  <img src="/logo.png" alt="Colisão RPG" width="360" height="139">
+  <div class="card">
+    <div class="seg" role="group" aria-label="Entrar ou criar conta">
+      <button type="button" data-auth="login" aria-pressed="true">Entrar</button>
+      <button type="button" data-auth="cadastro" aria-pressed="false">Criar conta</button>
+    </div>
+    <form id="form-auth" class="pane" autocomplete="on">
+      <label class="f"><span class="lbl">Usuário</span><input type="text" id="auth-user" name="username" autocomplete="username" required minlength="3" maxlength="30"></label>
+      <label class="f"><span class="lbl">Senha</span><input type="password" id="auth-pass" name="password" autocomplete="current-password" required minlength="6"></label>
+      <label class="f" id="auth-pass2-wrap" hidden><span class="lbl">Repita a senha</span><input type="password" id="auth-pass2" autocomplete="new-password" minlength="6"></label>
+      <div class="err" id="auth-err" role="alert"></div>
+      <button class="btn pri lg" type="submit" id="auth-submit">Entrar</button>
+    </form>
+  </div>
+  <p class="notice" id="convite-aviso" hidden></p>
+</main>
+
+<!-- Tela 2: lobby -->
+<main id="tela-lobby" class="mid" hidden>
+  <header class="top">
+    <div class="brand"><h1>Colisão</h1><span>Mesa</span></div>
+    <span class="chip" id="lobby-user"></span>
+    <button class="btn sm ghost" type="button" id="btn-logout">Sair da conta</button>
+  </header>
+  <div class="grid2">
+    <form class="card" id="form-criar">
+      <h3 class="sec">Criar sala</h3>
+      <label class="f"><span class="lbl">Nome da sala</span><input type="text" id="criar-nome" maxlength="60" placeholder="Ex.: Divisão Hydra — Terças"></label>
+      <label class="check"><input type="checkbox" id="criar-vale" checked> Começar com a sessão Vale das Cinzas</label>
+      <button class="btn pri" type="submit">Criar e virar Mestre</button>
+    </form>
+    <form class="card" id="form-entrar">
+      <h3 class="sec">Entrar numa sala</h3>
+      <label class="f"><span class="lbl">Código que o Mestre mandou</span><input type="text" id="entrar-codigo" class="mono" maxlength="8" placeholder="Ex.: 6NDAZP" style="text-transform:uppercase;letter-spacing:.15em"></label>
+      <div class="err" id="entrar-err" role="alert"></div>
+      <button class="btn pri" type="submit">Entrar como jogador</button>
+    </form>
+  </div>
+  <h2 class="sec">Suas salas</h2>
+  <div class="salas" id="lista-salas"></div>
+</main>
+
+<!-- Tela 3: sala -->
+<div id="tela-sala" class="wrap" hidden>
+  <header class="top">
+    <div class="brand"><h1>Colisão</h1><span id="sala-nome"></span></div>
+    <span class="chip" id="role-chip"></span>
+    <button class="chip" type="button" id="btn-convite" title="Copiar o convite da sala"><span class="codigo" id="sala-codigo"></span> copiar convite</button>
+    <span class="chip"><span class="dot" id="conn-dot"></span><span id="online">conectando</span></span>
+    <div class="sound-ctl">
+      <button class="btn sm" id="btn-som" type="button">Ativar som</button>
+      <input type="range" id="vol" min="0" max="1" step="0.05" value="0.8" aria-label="Volume">
+    </div>
+    <button class="btn sm ghost" type="button" id="btn-voltar">Salas</button>
+  </header>
+
+  <div id="spot"></div>
+
+  <nav class="tabs" role="tablist" aria-label="Seções da mesa" id="tabs"></nav>
+
+  <div class="layout">
+    <div>
+      <section class="pane" id="pane-combate">
+        <div class="toolbar" id="turn-bar"></div>
+        <div class="cb-list" id="cb-list"></div>
+        <div id="add-area"></div>
+      </section>
+      <section class="pane" id="pane-fichas" hidden></section>
+      <section class="pane" id="pane-roteiro" hidden></section>
+      <section class="pane" id="pane-pistas" hidden></section>
+      <section class="pane" id="pane-trilha" hidden></section>
+      <section class="pane" id="pane-jogadores" hidden></section>
+    </div>
+
+    <aside class="pane" id="pane-dados" hidden>
+      <div class="tray">
+        <h3>Dados</h3>
+        <div class="seg" role="group" aria-label="Tipo de rolagem">
+          <button type="button" data-mode="teste" aria-pressed="true">Teste</button>
+          <button type="button" data-mode="livre" aria-pressed="false">Livre</button>
+        </div>
+        <div id="mode-teste" class="pane" style="gap:10px">
+          <label class="f" id="t-attr-wrap" hidden><span class="lbl">Atributo da sua ficha</span>
+            <select id="t-attr"><option value="">Escolher na mão</option><option value="fisico">Físico</option><option value="tecnica">Técnica</option><option value="influencia">Influência</option></select></label>
+          <div class="row">
+            <span class="lbl">Pontos no atributo</span>
+            <div class="seg" id="t-pts" role="group" aria-label="Pontos no atributo">
+              <button type="button" data-pts="1" aria-pressed="true">1·d4</button><button type="button" data-pts="2" aria-pressed="false">2·d6</button><button type="button" data-pts="3" aria-pressed="false">3·d8</button><button type="button" data-pts="4" aria-pressed="false">4·d10</button>
+            </div>
+          </div>
+          <label class="f"><span class="lbl">Talento</span><select id="t-tal"></select></label>
+          <label class="check"><input type="checkbox" id="t-ten"> Tenacidade (+1 dado, gaste 1 de Vontade)</label>
+          <div class="row">
+            <span class="lbl">Vantagem</span>
+            <span class="step"><button type="button" data-cnt="vant" data-d="-1" aria-label="Menos vantagem">−</button><span class="mono" id="t-vant">0</span><button type="button" data-cnt="vant" data-d="1" aria-label="Mais vantagem">+</button></span>
+            <span class="lbl" style="margin-left:6px">Desvantagem</span>
+            <span class="step"><button type="button" data-cnt="desv" data-d="-1" aria-label="Menos desvantagem">−</button><span class="mono" id="t-desv">0</span><button type="button" data-cnt="desv" data-d="1" aria-label="Mais desvantagem">+</button></span>
+          </div>
+          <button class="btn pri" type="button" id="btn-rolar-teste">Rolar teste</button>
+        </div>
+        <div id="mode-livre" class="pane" style="gap:10px" hidden>
+          <div class="row">
+            <label class="lbl" for="l-qtd">Quantidade</label><input type="number" id="l-qtd" min="1" max="20" value="1">
+            <label class="lbl" for="l-mod">Modificador</label><input type="number" id="l-mod" value="0">
+          </div>
+          <div class="dice-btns">
+            <button type="button" data-free="4">d4</button><button type="button" data-free="6">d6</button><button type="button" data-free="8">d8</button>
+            <button type="button" data-free="10">d10</button><button type="button" data-free="12">d12</button><button type="button" data-free="20">d20</button>
+          </div>
+        </div>
+        <label class="check" id="secret-wrap" hidden><input type="checkbox" id="secret"> Rolar escondido (só eu vejo)</label>
+        <div class="row" style="justify-content:space-between">
+          <span class="lbl">Histórico</span>
+          <button class="btn ghost sm" type="button" id="btn-clear-log" hidden>Limpar</button>
+        </div>
+        <div class="log" id="log"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="voz" id="voz" role="status" aria-live="assertive" hidden><span class="lbl" id="voz-quem"></span><p id="voz-texto"></p></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

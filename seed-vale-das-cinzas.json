@@ -1,0 +1,228 @@
+{
+ "roteiro": {
+  "cenas": [
+   {
+    "id": "c1",
+    "titulo": "Briefing com Esdeath",
+    "resumo": "Leia: \"Toda cidade possui uma história. Vale das Cinzas possui uma oração. Uma oração repetida tantas vezes que algo começou a responder.\"\nEsdeath entrega a pasta: Lívia Moraes, 19 anos, sumiu há 6 dias. Carro achado no km 14 com motor ligado e porta aberta. Casos parecidos: Tomás Rezende (2024) e Irene Paiva (2025), todos de mudança.\nToque a Voz do Monstro no fim da gravação do celular de Lívia.",
+    "pistas": [
+     {
+      "id": "p1",
+      "texto": "Gravação do celular de Lívia, 3h da manhã: um sino ao longe e muitas vozes rezando em coro. No fim, uma voz grave termina a oração sozinha.",
+      "teste": "",
+      "revelada": false
+     },
+     {
+      "id": "p2",
+      "texto": "Relatório de 1996 (Valter): linha riscada à mão: \"Padre A. pediu proteção. Recomendo arquivar. — E.\"",
+      "teste": "Estudo Dt 8",
+      "revelada": false
+     }
+    ]
+   },
+   {
+    "id": "c2",
+    "titulo": "Carro de Lívia (km 14)",
+    "resumo": "Estrada de mão única, mata parada, nenhum pássaro.",
+    "pistas": [
+     {
+      "id": "p3",
+      "texto": "Não há pegadas saindo do carro, só uma trilha de cinza fina indo morro acima, em direção ao Vale.",
+      "teste": "Sobrevivência Dt 6",
+      "revelada": false
+     },
+     {
+      "id": "p4",
+      "texto": "O GPS do celular marca 14 km rodados; o hodômetro do carro marca 140 km. Ela rodou em círculos sem perceber.",
+      "teste": "Estratégia Dt 8",
+      "revelada": false
+     },
+     {
+      "id": "p5",
+      "texto": "A cinza no banco do motorista tem traços de osso humano.",
+      "teste": "Biologia Dt 10",
+      "revelada": false
+     }
+    ]
+   },
+   {
+    "id": "c3",
+    "titulo": "Bar da Dona Cida",
+    "resumo": "Moradores gentis demais, todos com broche de cinza prensada em forma de mão.",
+    "pistas": [
+     {
+      "id": "p6",
+      "texto": "Todos repetem a mesma frase: \"Ela não se perdeu. Ninguém aqui se perde.\"",
+      "teste": "Eloquência Dt 6",
+      "revelada": false
+     },
+     {
+      "id": "p7",
+      "texto": "A frase sai automática, como reza. Os moradores se incomodam quando alguém fala em ir embora.",
+      "teste": "Psique Dt 8",
+      "revelada": false
+     },
+     {
+      "id": "p8",
+      "texto": "Dona Cida confessa: \"Meu irmão tentou sair em 2019. Toda madrugada eu rezo pra ele.\"",
+      "teste": "Performance Dt 10 (Dar Suporte)",
+      "revelada": false
+     }
+    ]
+   },
+   {
+    "id": "c4",
+    "titulo": "Casa paroquial (padre Anselmo)",
+    "resumo": "Anselmo, 71 anos, criou a Novena das Cinzas depois do incêndio de 1996, que matou seu filho Davi.",
+    "pistas": [
+     {
+      "id": "p9",
+      "texto": "Texto da Novena das Cinzas. O pedido final: \"que nenhum filho deste vale se perca de novo\".",
+      "teste": "Eloquência Dt 8",
+      "revelada": false
+     },
+     {
+      "id": "p10",
+      "texto": "Caderno com a contagem das rezas: mais de 10.900 noites seguidas, sem falhar uma.",
+      "teste": "Estudo Dt 8",
+      "revelada": false
+     },
+     {
+      "id": "p11",
+      "texto": "Anselmo sabe que algo responde. Acha que é Deus atendendo, e não quer saber o preço.",
+      "teste": "Psique Dt 12",
+      "revelada": false
+     }
+    ]
+   },
+   {
+    "id": "c5",
+    "titulo": "Cemitério",
+    "resumo": "Doze túmulos com a mesma data.",
+    "pistas": [
+     {
+      "id": "p12",
+      "texto": "Doze túmulos com a data 14/08/1996. Um deles é de Davi, filho de Anselmo.",
+      "teste": "Estudo Dt 4",
+      "revelada": false
+     },
+     {
+      "id": "p13",
+      "texto": "O túmulo de Davi está aberto por dentro, e vazio.",
+      "teste": "Medicina Dt 8",
+      "revelada": false
+     },
+     {
+      "id": "p14",
+      "texto": "Sob a lápide caída, a Novena está entalhada na pedra com unhas.",
+      "teste": "Atletismo Dt 10 (Dar Suporte)",
+      "revelada": false
+     }
+    ]
+   },
+   {
+    "id": "c6",
+    "titulo": "A Novena das 3h",
+    "resumo": "O sino toca e a cidade inteira sai para rezar na praça, virada para o morro. Teste de Pavor: Vontade contra Calamidade 3 (+1 por Medo acima de 5).\nGanchos em ordem: coro erra e uma voz termina a frase (+1 Medo); Lívia entre os que rezam, some ao toque (+2); as vozes saem da boca dos agentes (+2); 13ª badalada (+3).\nToque o Sino 13 vezes e o Batimento em loop.",
+    "pistas": [
+     {
+      "id": "p15",
+      "texto": "O sino toca 13 vezes. Doze, uma por morto de 1996. A 13ª é Lívia.",
+      "teste": "Contar as badaladas",
+      "revelada": false
+     },
+     {
+      "id": "p16",
+      "texto": "Uma trilha de cinza brilhante sobe o morro até a igreja velha.",
+      "teste": "",
+      "revelada": false
+     }
+    ]
+   },
+   {
+    "id": "c7",
+    "titulo": "Igreja velha e a Colisão",
+    "resumo": "Ao entrar, Cenário Utópico: a estrada de 1996 em chamas de cinza fria. PV vira Persona, Vontade cai 1 por rodada.\nFraquezas da criatura: silêncio (−5 PV por rodada sem reza), pedido contraditório (atordoa 1 rodada; Eloquência/Performance Dt 10), destruir o sino (Ca 6, 20 PV) tira metade dos PV.\nFinais: Libertação (mudar o pedido com Anselmo, Eloquência Dt 12), Silêncio, Fuga, Sucumbir.",
+    "pistas": [
+     {
+      "id": "p17",
+      "texto": "O sino está rachado e não deveria tocar, mas a corda tem marcas de uso recente.",
+      "teste": "Engenharia Dt 6",
+      "revelada": false
+     },
+     {
+      "id": "p18",
+      "texto": "As estátuas de cinza no altar são feitas da mesma cinza do carro de Lívia. Uma delas ainda está morna.",
+      "teste": "Química Dt 10",
+      "revelada": false
+     }
+    ]
+   }
+  ],
+  "npcs": [
+   {
+    "id": "n1",
+    "nome": "Esdeath",
+    "texto": "Comandante da organização. Fria, frases curtas, pausas longas. Sala gelada.\n\"Três pessoas sumiram numa estrada de mão única. Isso não é acidente, é padrão.\"\n\"Se o sino tocar, contem as badaladas. Sempre contem.\""
+   },
+   {
+    "id": "n2",
+    "nome": "Valter, o Arquivista Cético",
+    "texto": "Subsolo da base Hydra. Dá o relatório de 1996, lanternas e verba. \"É tudo histeria coletiva.\""
+   },
+   {
+    "id": "n3",
+    "nome": "Elara, a Viajante das Bordas",
+    "texto": "Posto de estrada a 30 km. \"Lá não tem passarinho, nem grilo. A mata não mexe nem com vento.\" Vende amuletos de sal grosso."
+   },
+   {
+    "id": "n4",
+    "nome": "Inácio, o Estudioso das Trocas",
+    "texto": "Por telefone. \"Para quebrar um selo de oração, mude o pedido ou cale quem pede.\" Cobra o direito de ler o relatório."
+   },
+   {
+    "id": "n5",
+    "nome": "Padre Anselmo",
+    "texto": "71 anos, criou a Novena. Só ajuda se ouvir que Davi não está protegido, e sim preso."
+   },
+   {
+    "id": "n6",
+    "nome": "Dona Cida",
+    "texto": "Dona do bar. Reza toda madrugada pelo irmão que tentou sair em 2019."
+   }
+  ],
+  "falas": [
+   {
+    "id": "f1",
+    "texto": "Ninguém aqui se perde."
+   },
+   {
+    "id": "f2",
+    "texto": "Fiquem. Eu guardo vocês."
+   },
+   {
+    "id": "f3",
+    "texto": "Treze. Treze filhos guardados."
+   },
+   {
+    "id": "f4",
+    "texto": "Por que vocês querem ir embora?"
+   },
+   {
+    "id": "f5",
+    "texto": "Que nenhum filho deste vale se perca de novo."
+   }
+  ]
+ },
+ "criaturas": [
+  {
+   "nome": "Aquele que Responde",
+   "pv": 60,
+   "pvMax": 60,
+   "caBase": 8,
+   "tecnica": 2,
+   "oculto": true,
+   "notas": "Calamidade 3. Abraço de Cinza 2d6 (Fortitude Dt 8 ou perde 1 PA). Amém: em área, Vontade Dt = Medo atual ou ajoelha e perde o turno."
+  }
+ ]
+}
